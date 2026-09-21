@@ -79,6 +79,16 @@ var a = BspAgent.Install("제품id");                                        // 
 사용자에게(a.Pending ? "리빗을 껐다 켜면 적용됩니다" : a.Status);
 ```
 
+### 동적 로드 (선택 · 지연 로드를 쓰고 있다면)
+
+```csharp
+var dir = BspAgent.Stage("제품id");                                // 복사본 폴더
+var asm = Assembly.LoadFrom(Path.Combine(dir, "제품.dll"));        // 첫 클릭 때
+```
+
+원본을 잠그지 않으므로 **리빗이 켜진 채로도 새 버전이 내려앉는다** (반영은 다음 기동).
+지금 원본 자리에서 바로 로드하고 있다면 이 한 줄만 바꾸면 된다.
+
 ### 도구 실행 (선택 · 나중에 해도 된다)
 
 ```csharp

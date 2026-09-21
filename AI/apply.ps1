@@ -19,6 +19,7 @@ param(
   [Parameter(Mandatory = $true)][string]$Project,
   [string]$ManifestUrl = "", [string]$Token = "", [string]$AuthHeader = "x-bsp-key",
   [string]$RevitYear = "2024",
+  [string]$InstallTo = "",
   [switch]$Check, [switch]$NoBuild
 )
 
@@ -137,6 +138,50 @@ if ($csproj) {
 }
 else { Row "참조 추가" $null "csproj 가 없어 lib\ 에 파일만 놓음 — 빌드 스크립트에 /r: 로 추가하세요" }
 
+# ── 6-1. 서버 연결 — 한 번 확인하고 설정에 박아 둔다 ────────────────
+#   이게 되면 리빗을 켤 때마다 매니저가 알아서 받아 둔다. 사람이 할 일은 없다.
+$cfgPath = Join-Path $lib "config.json"
+if ($ManifestUrl) {
+  $ok = $false; $detail = ""
+  try {
+    $h = @{}; if ($Token) { $h[$AuthHeader] = $Token }
+    $r = Invoke-WebRequest -Uri $ManifestUrl -Headers $h -UseBasicParsing -TimeoutSec 20
+    $m = $r.Content | ConvertFrom-Json
+    $bad = @()
+    foreach ($pr in $m.products) {
+      if (-not ($pr.versions | Where-Object { $_.version -eq $pr.latest })) { $bad += "$($pr.id): latest 없음" }
+      foreach ($v in $pr.versions) { foreach ($f in $v.files) {
+        if (-not $f.sha256 -or $f.sha256.Length -ne 64) { $bad += "$($pr.id)/$($f.path): sha256" }
+        if (-not $f.url) { $bad += "$($pr.id)/$($f.path): url" } } }
+    }
+    $ok = ($bad.Count -eq 0)
+    $detail = if ($ok) { "제품 $($m.products.Count)개 · 형식 정상" } else { ($bad | Select-Object -First 2) -join " / " }
+  } catch { $detail = $_.Exception.Message }
+  Row "서버 연결" $ok $detail
+}
+else { Row "서버 연결" $null "주소를 주지 않아 오프라인 설정 (나중에 config.json 의 manifestUrl 만 채우면 된다)" }
+
+$cfg = [ordered]@{
+  server = ""; manifestUrl = $ManifestUrl; usageUrl = ""; memberUrl = ""
+  authHeader = $AuthHeader; token = $Token; tenant = "bsp-internal"
+  revitYear = $RevitYear; pollSeconds = 60; requireMember = $false
+  lifetime = "addon"; exitGraceSeconds = 60
+} | ConvertTo-Json
+[IO.File]::WriteAllText($cfgPath, $cfg, (New-Object Text.UTF8Encoding($false)))
+Row "설정" $true $cfgPath
+
+# ── 6-2. 설치 (원하면) — 애드온 폴더에 네 파일을 나란히 ─────────────
+if ($InstallTo) {
+  if (Get-Process Revit -ErrorAction SilentlyContinue) {
+    Row "설치" $false "리빗이 켜져 있습니다 — 닫고 다시 실행하세요"
+  }
+  else {
+    New-Item -ItemType Directory -Force $InstallTo | Out-Null
+    Copy-Item $agent, $mgr, $cfgPath $InstallTo -Force
+    Row "설치" $true "$InstallTo (에이전트·매니저·설정)"
+  }
+}
+
 # ── 7. 빌드 ────────────────────────────────────────────────────────
 if ($NoBuild -or -not $csproj) { Row "빌드" $null "건너뜀" }
 else {
@@ -171,6 +216,12 @@ else { Row "서버 점검" $null "주소를 주지 않아 건너뜀 (-ManifestUr
 Write-Host ("-" * 92)
 $bad = @($rows | Where-Object 판정 -eq "FAIL").Count
 Write-Host ("결과 : {0} OK · {1} FAIL" -f @($rows | Where-Object 판정 -eq "OK").Count, $bad) -ForegroundColor $(if ($bad) { "Red" } else { "Green" })
-if ($bad -eq 0) { Write-Host "이제 리빗을 껐다 켜면 세션·기록이 남기 시작합니다." -ForegroundColor Cyan }
+if ($bad -eq 0) {
+  Write-Host "" 
+  Write-Host "끝났습니다. 이제 리빗을 켜면 :" -ForegroundColor Cyan
+  Write-Host "   · 매니저가 자동으로 뜨고(별도 프로세스), 리빗을 닫으면 같이 정리됩니다"
+  Write-Host "   · 서버에 새 버전이 올라오면 받아 두었다가 다음 기동 때 적용됩니다"
+  Write-Host "   · 사용·멈춤·사고 기록이 남습니다.  확인 :  .\AI\healthcheck.ps1"
+}
 Write-Host "되돌리기 : 리빗 닫고  .\AI\snapshot.ps1 -Restore   (코드는 $stash 에 원본 보관)" -ForegroundColor DarkGray
 exit $(if ($bad) { 1 } else { 0 })

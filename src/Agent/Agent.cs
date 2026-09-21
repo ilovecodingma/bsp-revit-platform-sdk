@@ -56,6 +56,7 @@ namespace BSP.Platform.Agent
         {
             Log("bsp.agent", "detach", "ok", 0, "");
             LauncherHost.Release(Pid > 0 ? Pid : SafePid());
+            Unstage();                       // 이 세션이 쓴 복사본 정리
         }
 
         // ------------------------------------------------------------------ 시키기
@@ -70,6 +71,60 @@ namespace BSP.Platform.Agent
 
         public static Answer Enable(string productId) { return Requests.Send("enable", productId, 15000); }
         public static Answer Disable(string productId) { return Requests.Send("disable", productId, 15000); }
+
+        // ------------------------------------------------------------------ 동적 로드
+        /// <summary>도구를 «원본을 잠그지 않고» 싣기 위한 자리를 만든다.
+        ///
+        ///   문제 : .NET Framework 는 한 번 로드한 DLL 을 내리지 못하고, 로드된 파일은 잠긴다.
+        ///          그래서 리빗이 켜져 있는 동안에는 그 도구를 갈아끼울 수 없다.
+        ///   해법 : **세션 폴더로 복사해서 거기서 로드한다.** 원본은 아무도 안 잡고 있으므로
+        ///          매니저가 리빗이 켜진 채로도 새 버전을 덮을 수 있다. 반영은 다음 기동.
+        ///
+        ///   host 쪽 사용법 :
+        ///       var dir = BspAgent.Stage("bsp.hts");                 // 복사본 폴더
+        ///       var asm = Assembly.LoadFrom(Path.Combine(dir, "BSP.Hub.dll"));   // 첫 클릭 때
+        ///
+        /// 실패하면 원본 폴더를 그대로 돌려준다 — 못 해도 동작은 한다.</summary>
+        public static string Stage(string productId)
+        {
+            var src = Path.Combine(StateDir, "Tools", productId ?? "");
+            try
+            {
+                if (!Directory.Exists(src)) return src;
+                var dst = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "BSP", "Platform", "stage", SafePid().ToString(), productId ?? "");
+                Directory.CreateDirectory(dst);
+
+                foreach (var f in Directory.GetFiles(src, "*", SearchOption.AllDirectories))
+                {
+                    var rel = f.Substring(src.Length).TrimStart(Path.DirectorySeparatorChar);
+                    var t = Path.Combine(dst, rel);
+                    Directory.CreateDirectory(Path.GetDirectoryName(t));
+                    // 이미 같은 내용이면 건너뛴다 (매번 복사하면 기동이 느려진다)
+                    if (File.Exists(t) && new FileInfo(t).Length == new FileInfo(f).Length &&
+                        File.GetLastWriteTimeUtc(t) == File.GetLastWriteTimeUtc(f)) continue;
+                    File.Copy(f, t, true);
+                    File.SetLastWriteTimeUtc(t, File.GetLastWriteTimeUtc(f));
+                }
+                Log(productId, "stage", "ok", 0, dst);
+                return dst;
+            }
+            catch (Exception ex) { Log(productId, "stage", "failed", 0, ex.Message); return src; }
+        }
+
+        /// <summary>이 세션이 쓴 복사본을 지운다. Detach 가 자동으로 부른다.</summary>
+        static void Unstage()
+        {
+            try
+            {
+                var dir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "BSP", "Platform", "stage", (Pid > 0 ? Pid : SafePid()).ToString());
+                if (Directory.Exists(dir)) Directory.Delete(dir, true);
+            }
+            catch { }   // 잠겨 있으면 다음 세션이 덮어쓴다. 남아도 해롭지 않다
+        }
 
         // ------------------------------------------------------------------ 보기
         /// <summary>매니저가 지금 돌고 있나.</summary>
