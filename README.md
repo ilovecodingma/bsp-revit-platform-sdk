@@ -43,6 +43,23 @@ BSP_SDK\
   samples\HelloTool\        최소 도구 한 개 (소스 + build.ps1)
 ```
 
+## 붙여넣을 한 줄 (이것만 하면 된다)
+
+AI(클로드 코드 등)에 **아래를 그대로 붙여 넣고 엔터.** 나머지는 AI 가 물어보면서 진행한다.
+
+```
+https://github.com/ilovecodingma/bsp-revit-platform-sdk 를 내려받아서
+AI\SETUP.md 를 읽고 그대로 진행해줘. 내 환경에 맞춰 하나씩 물어보고,
+각 단계마다 확인 명령을 돌려서 결과를 보여줘.
+```
+
+내려받기만 따로 하려면 :
+
+```powershell
+git clone https://github.com/ilovecodingma/bsp-revit-platform-sdk
+# 또는 : https://github.com/ilovecodingma/bsp-revit-platform-sdk/archive/refs/heads/main.zip
+```
+
 ## 대표님께 — 어디부터 보면 되나
 
 1. `PROPOSAL.md` — 무엇을 드리고 무엇을 맡기는지 (한 장)
