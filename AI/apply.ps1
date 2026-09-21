@@ -1,0 +1,176 @@
+﻿<#
+  bsp-apply — 한 번 실행하면 끝난다.
+    점검 → 붙이기 → 고치기 → 빌드 → 검증 → 결과표
+
+    .\AI\apply.ps1 -Project C:\내플랫폼\MyAddin            (폴더 또는 .csproj)
+    .\AI\apply.ps1 -Project ... -ManifestUrl https://…     서버까지 같이 점검
+    .\AI\apply.ps1 -Project ... -Check                     건드리지 않고 점검만
+
+  하는 일
+    1. 보관        snapshot (언제든 -Restore 로 되돌림)
+    2. 코드 점검    IExternalApplication · OnStartup/OnShutdown · 이미 붙었나
+    3. 참조 점검    RevitAPI 연도 일치 · 같은 어셈블리 두 버전 · 런타임 계열 · 서명
+    4. 붙이기      OnStartup 에 Attach, OnShutdown 에 Detach (기존 코드는 안 지운다)
+    5. 참조 추가    BSP.Platform.Agent.dll (+ 출력 폴더에 bsp-launcher.exe)
+    6. 빌드        csproj 면 msbuild/dotnet, 아니면 건너뛴다
+    7. 검증        bsp-probe cycle + 서버 점검
+#>
+param(
+  [Parameter(Mandatory = $true)][string]$Project,
+  [string]$ManifestUrl = "", [string]$Token = "", [string]$AuthHeader = "x-bsp-key",
+  [string]$RevitYear = "2024",
+  [switch]$Check, [switch]$NoBuild
+)
+
+$ErrorActionPreference = "Stop"
+$sdk = Split-Path $PSScriptRoot -Parent
+$rows = @()
+function Row($step, $ok, $detail) {
+  $script:rows += [pscustomobject]@{ 단계 = $step; 판정 = $(if ($ok -eq $null) { "—" } elseif ($ok) { "OK" } else { "FAIL" }); 내용 = $detail }
+  $c = if ($ok -eq $null) { "DarkGray" } elseif ($ok) { "Green" } else { "Red" }
+  Write-Host ("{0,-5} {1,-14} {2}" -f $(if ($ok -eq $null) { "  · " } elseif ($ok) { "OK" } else { "FAIL" }), $step, $detail) -ForegroundColor $c
+}
+
+Write-Host "`nbsp-apply · $Project" -ForegroundColor Cyan
+Write-Host ("-" * 92)
+
+# ── 1. 대상 파악 ────────────────────────────────────────────────────
+if (-not (Test-Path $Project)) { Row "대상" $false "경로가 없습니다"; exit 1 }
+$isProj = $Project -like "*.csproj"
+$root = if ($isProj) { Split-Path $Project -Parent } else { (Resolve-Path $Project).Path }
+$csproj = if ($isProj) { $Project } else { (Get-ChildItem $root -Filter *.csproj -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1).FullName }
+$sources = @(Get-ChildItem $root -Filter *.cs -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch '\\(obj|bin)\\' })
+Row "대상" $true ("소스 {0}개 · {1}" -f $sources.Count, $(if ($csproj) { Split-Path $csproj -Leaf } else { "csproj 없음 (빌드는 건너뜀)" }))
+
+# ── 2. 진입점 찾기 ──────────────────────────────────────────────────
+$entry = $null
+foreach ($f in $sources) {
+  $t = [IO.File]::ReadAllText($f.FullName)
+  if ($t -match 'IExternalApplication' -and $t -match 'OnStartup') { $entry = $f; break }
+}
+if (-not $entry) { Row "진입점" $false "IExternalApplication 구현을 못 찾음 — 경로를 확인하세요"; exit 1 }
+$src = [IO.File]::ReadAllText($entry.FullName)
+$already = $src -match 'BspAgent\.Attach'
+Row "진입점" $true ("{0}{1}" -f $entry.Name, $(if ($already) { "  (이미 붙어 있음)" } else { "" }))
+
+# ── 3. 참조 점검 ────────────────────────────────────────────────────
+$built = @(Get-ChildItem $root -Filter *.dll -Recurse -ErrorAction SilentlyContinue |
+           Where-Object { $_.FullName -match '\\bin\\' -and $_.Name -notmatch '^(Revit|AdWindows|System\.)' })
+$verdict = $true; $notes = @()
+foreach ($d in $built) {
+  try {
+    $a = [Reflection.Assembly]::ReflectionOnlyLoadFrom($d.FullName)
+    $refs = $a.GetReferencedAssemblies()
+    $dupes = $refs | Group-Object Name | Where-Object Count -gt 1
+    foreach ($g in $dupes) { $verdict = $false; $notes += "$($d.Name) : $($g.Name) 가 $($g.Count)개 버전" }
+    $api = @($refs | Where-Object Name -match '^RevitAPI')
+    foreach ($r in $api) {
+      $major = $r.Version.Major
+      if ($major -ne ([int]$RevitYear - 2000)) {
+        $verdict = $false
+        $notes += "$($d.Name) : $($r.Name) $($r.Version) — 선언 $RevitYear 와 불일치 (누르는 순간 죽는 사고 유형)"
+      }
+    }
+  } catch { }
+}
+if ($built.Count -eq 0) { Row "참조 점검" $null "빌드 산출물이 없어 건너뜀 (빌드 후 다시 확인됩니다)" }
+else { Row "참조 점검" $verdict $(if ($verdict) { "$($built.Count)개 DLL · 충돌 없음 · API $RevitYear 일치" } else { ($notes | Select-Object -First 3) -join " / " }) }
+
+if ($Check) {
+  Write-Host ("-" * 92)
+  Write-Host "점검만 했습니다. 붙이려면 -Check 를 빼고 다시 실행하세요." -ForegroundColor Yellow
+  exit $(if ($verdict) { 0 } else { 1 })
+}
+
+# ── 4. 보관 ────────────────────────────────────────────────────────
+& (Join-Path $PSScriptRoot "snapshot.ps1") -RevitYear $RevitYear | Out-Null
+$stash = Join-Path ([IO.Path]::GetTempPath()) ("bsp-apply-" + (Get-Date -f "yyyyMMdd-HHmmss"))
+New-Item -ItemType Directory -Force $stash | Out-Null
+Copy-Item $entry.FullName $stash -Force
+if ($csproj) { Copy-Item $csproj $stash -Force }
+Row "보관" $true $stash
+
+# ── 5. 두 줄 붙이기 ────────────────────────────────────────────────
+if ($already) { Row "붙이기" $null "이미 붙어 있어 건너뜀" }
+else {
+  $new = $src
+  if ($new -notmatch 'using\s+BSP\.Platform\.Agent\s*;') {
+    $new = [regex]::Replace($new, '(using\s+Autodesk\.Revit\.UI\s*;)', "`$1`r`nusing BSP.Platform.Agent;", 1)
+  }
+  # OnStartup 의 여는 중괄호 바로 뒤에 Attach — 기존 코드보다 먼저 세션을 남긴다
+  $new = [regex]::Replace($new,
+    '(?s)(Result\s+OnStartup\s*\([^)]*\)\s*\{)',
+    "`$1`r`n            BSP.Platform.Agent.BspAgent.Attach(a.ControlledApplication.VersionNumber, System.Diagnostics.Process.GetCurrentProcess().Id);   // BSP SDK", 1)
+  $new = [regex]::Replace($new,
+    '(?s)(Result\s+OnShutdown\s*\([^)]*\)\s*\{)',
+    "`$1`r`n            BSP.Platform.Agent.BspAgent.Detach();   // BSP SDK", 1)
+
+  if ($new -eq $src) { Row "붙이기" $false "OnStartup/OnShutdown 서명을 찾지 못함 — 수동으로 두 줄 넣으세요" }
+  else {
+    [IO.File]::WriteAllText($entry.FullName, $new, (New-Object Text.UTF8Encoding($false)))
+    Row "붙이기" $true "$($entry.Name) 에 Attach/Detach 두 줄 (기존 코드는 그대로)"
+  }
+}
+
+# ── 6. 참조·파일 배치 ──────────────────────────────────────────────
+$agent = Join-Path $sdk "bin\BSP.Platform.Agent.dll"
+$mgr = Join-Path $sdk "bin\bsp-launcher.exe"
+$lib = Join-Path $root "lib"
+New-Item -ItemType Directory -Force $lib | Out-Null
+Copy-Item $agent, $mgr $lib -Force
+if ($csproj) {
+  $x = [xml](Get-Content $csproj)
+  $ns = $x.Project.NamespaceURI
+  $has = $x.SelectNodes("//*[local-name()='Reference']") | Where-Object { $_.Include -like "BSP.Platform.Agent*" }
+  if (-not $has) {
+    $ig = $x.CreateElement("ItemGroup", $ns)
+    $ref = $x.CreateElement("Reference", $ns)
+    $ref.SetAttribute("Include", "BSP.Platform.Agent")
+    $hp = $x.CreateElement("HintPath", $ns); $hp.InnerText = "lib\BSP.Platform.Agent.dll"
+    $pv = $x.CreateElement("Private", $ns); $pv.InnerText = "true"
+    $ref.AppendChild($hp) | Out-Null; $ref.AppendChild($pv) | Out-Null
+    $ig.AppendChild($ref) | Out-Null; $x.Project.AppendChild($ig) | Out-Null
+    $x.Save($csproj)
+    Row "참조 추가" $true "csproj 에 BSP.Platform.Agent (lib\)"
+  }
+  else { Row "참조 추가" $null "이미 있음" }
+}
+else { Row "참조 추가" $null "csproj 가 없어 lib\ 에 파일만 놓음 — 빌드 스크립트에 /r: 로 추가하세요" }
+
+# ── 7. 빌드 ────────────────────────────────────────────────────────
+if ($NoBuild -or -not $csproj) { Row "빌드" $null "건너뜀" }
+else {
+  $msb = (Get-Command msbuild -ErrorAction SilentlyContinue)
+  $log = Join-Path $stash "build.log"
+  if ($msb) { & msbuild $csproj /v:m /nologo > $log 2>&1 }
+  else { & dotnet build $csproj -v m > $log 2>&1 }
+  Row "빌드" ($LASTEXITCODE -eq 0) $(if ($LASTEXITCODE -eq 0) { "성공" } else { "실패 — $log" })
+}
+
+# ── 8. 검증 ────────────────────────────────────────────────────────
+$probe = Join-Path $sdk "bin\bsp-probe.exe"
+if (Test-Path $probe) {
+  $out = & $probe cycle 2>&1 | Out-String
+  # 요약 줄만 믿는다 — 본문에도 PASS/FAIL 이라는 낱말이 나온다
+  $m = [regex]::Match($out, "결과 : (\d+) PASS . (\d+) FAIL")
+  if ($m.Success) {
+    $pass = [int]$m.Groups[1].Value; $fail = [int]$m.Groups[2].Value
+    Row "코어 검증" ($fail -eq 0) "bsp-probe cycle : $pass PASS · $fail FAIL"
+  }
+  else { Row "코어 검증" $false "probe 결과를 읽지 못함" }
+}
+
+if ($ManifestUrl) {
+  $st = & (Join-Path $PSScriptRoot "selftest.ps1") -ManifestUrl $ManifestUrl -Token $Token -AuthHeader $AuthHeader 2>&1 | Out-String
+  $m2 = [regex]::Match($st, "결과 : (\d+) PASS . (\d+) FAIL")
+  $sf = if ($m2.Success) { [int]$m2.Groups[2].Value } else { 1 }
+  Row "서버 점검" ($sf -eq 0) $(if ($m2.Success) { $m2.Value } else { "selftest 결과를 읽지 못함" })
+}
+else { Row "서버 점검" $null "주소를 주지 않아 건너뜀 (-ManifestUrl)" }
+
+Write-Host ("-" * 92)
+$bad = @($rows | Where-Object 판정 -eq "FAIL").Count
+Write-Host ("결과 : {0} OK · {1} FAIL" -f @($rows | Where-Object 판정 -eq "OK").Count, $bad) -ForegroundColor $(if ($bad) { "Red" } else { "Green" })
+if ($bad -eq 0) { Write-Host "이제 리빗을 껐다 켜면 세션·기록이 남기 시작합니다." -ForegroundColor Cyan }
+Write-Host "되돌리기 : 리빗 닫고  .\AI\snapshot.ps1 -Restore   (코드는 $stash 에 원본 보관)" -ForegroundColor DarkGray
+exit $(if ($bad) { 1 } else { 0 })

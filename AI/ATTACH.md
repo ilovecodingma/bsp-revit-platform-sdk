@@ -8,6 +8,15 @@
 
 ---
 
+## 0-0. 자동으로 끝내려면
+
+```powershell
+.\AIpply.ps1 -Project <애드인 폴더/csproj> -ManifestUrl <서버 주소>
+```
+
+이 한 줄이 아래 1~4장을 그대로 수행하고 OK/FAIL 표로 끝난다.
+**손으로 확인하며 가고 싶을 때만** 아래를 따른다.
+
 ## 0. 먼저 읽고, 먼저 물어본다
 
 ```powershell

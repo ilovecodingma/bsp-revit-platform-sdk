@@ -1,0 +1,1 @@
+{"server":"http://127.0.0.1:8787","tenant":"bsp-internal","revitYear":"2024","pollSeconds":60,"memWarnMB":3000,"memHighMB":4500,"trimWorkingSet":false,"modWarnGrow":60,"token":"","manifestUrl":"","usageUrl":"","memberUrl":"","authHeader":"x-bsp-key","requireMember":false,"hostProcess":"Revit","exitWithHost":true,"exitGraceSeconds":60,"lifetime":"addon"}
