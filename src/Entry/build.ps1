@@ -52,7 +52,7 @@ if ($Install) {
   $dest = "$env:APPDATA\Autodesk\Revit\Addins\$RevitYear"
   New-Item -ItemType Directory -Force (Join-Path $dest "BSP.Platform.Entry") | Out-Null
   Copy-Item $dll (Join-Path $dest "BSP.Platform.Entry\BSP.Platform.Entry.dll") -Force
-  Copy-Item "$here\..\Agentin\BSP.Platform.Agent.dll" (Join-Path $dest "BSP.Platform.Entry\") -Force
+  Copy-Item "$here\..\Agentin\BSP.Platform.Agent.dll" (Join-Path $dest "BSP.Platform.Entry\") -Force
   Copy-Item $addinPath (Join-Path $dest "BSP.Platform.Entry.addin") -Force
 
   # 매니저 본체는 애드온 옆에 둔다 — 애드온이 가장 먼저 찾는 자리
