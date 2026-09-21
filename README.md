@@ -22,7 +22,7 @@ BSP_SDK\
   CLAUDE.md                 AI 에게 주는 오리엔테이션 (이 폴더에서 열면 자동으로 읽힌다)
   docs\                     논의 기록 — 왜 그렇게 정했나 (결정 기록 · 현황과 실측 · 배경)
   AI\HARNESS.md             ★ 경계 — 우리 최소 코어 / 하네스 / 그쪽 몫
-  AIpply.ps1              ★ 한 명령 — 점검·붙이기·빌드·검증을 한 번에
+  AI\apply.ps1              ★ 한 명령 — 점검·붙이기·빌드·검증을 한 번에
   AI\ATTACH.md              이미 있는 플랫폼 코드에 붙이는 법 (네 줄 · 3단계 이관)
   AI\MIGRATE.md             전환 매뉴얼 — 지금 구조 → 런처 형식, 6단계·단계마다 확인
   AI\TEST.md                시험 매뉴얼 — 무엇을 어떻게 확인하고 어떻게 적는가
@@ -60,7 +60,7 @@ AI(클로드 코드 등)에 **아래를 그대로 붙여 넣고 엔터.** 나머
 ### 한 명령 (사람이 판단할 것 없음)
 
 ```powershell
-.\AIpply.ps1 -Project <내 애드인 폴더 또는 .csproj> -ManifestUrl <내 서버 주소>
+.\AI\apply.ps1 -Project <내 애드인 폴더 또는 .csproj> -ManifestUrl <내 서버 주소>
 ```
 
 점검 → 보관 → **두 줄 붙이기** → 참조 추가 → 빌드 → `bsp-probe` → 서버 점검까지 한 번에 하고

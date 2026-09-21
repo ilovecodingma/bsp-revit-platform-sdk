@@ -11,7 +11,7 @@
 ## 0-0. 자동으로 끝내려면
 
 ```powershell
-.\AIpply.ps1 -Project <애드인 폴더/csproj> -ManifestUrl <서버 주소>
+.\AI\apply.ps1 -Project <애드인 폴더/csproj> -ManifestUrl <서버 주소>
 ```
 
 이 한 줄이 아래 1~4장을 그대로 수행하고 OK/FAIL 표로 끝난다.
