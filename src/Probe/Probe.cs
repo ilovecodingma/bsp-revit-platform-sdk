@@ -87,9 +87,19 @@ static class Probe
 
         // 6. 떼기 — 애드온 OnShutdown 에 해당
         BspAgent.Detach();
-        var gone = WaitFor(() => !BspAgent.ManagerAlive, 90000);
-        Check("떼기", gone, gone ? "마지막 세션이 사라지자 매니저가 스스로 끝냈다"
-                                 : "90초가 지나도 매니저가 남아 있다 (config 의 exitGraceSeconds 확인)");
+        // ★ 다른 리빗이 붙어 있으면 매니저는 **남아 있는 것이 정상**이다.
+        //   그 상태에서 «안 죽었다» 고 FAIL 을 내면 거짓 실패가 된다 (실측).
+        int others = Sessions();
+        if (others > 0)
+        {
+            Check("떼기", true, "다른 리빗 세션 " + others + "개가 살아 있어 매니저 유지 — 정상");
+        }
+        else
+        {
+            var gone = WaitFor(() => !BspAgent.ManagerAlive, 90000);
+            Check("떼기", gone, gone ? "마지막 세션이 사라지자 매니저가 스스로 끝냈다"
+                                     : "90초가 지나도 매니저가 남아 있다 (config 의 exitGraceSeconds 확인)");
+        }
 
         Console.WriteLine(new string('-', 88));
         Console.WriteLine("결과 : {0} PASS · {1} FAIL", pass, fail);
@@ -132,6 +142,27 @@ static class Probe
                 Console.WriteLine("   · " + line.Split('"')[0]);
         }
         return 0;
+    }
+
+    /// <summary>지금 살아 있는 애드온 세션 수 (내 것은 이미 뗐다).</summary>
+    static int Sessions()
+    {
+        try
+        {
+            var dir = Path.Combine(BspAgent.StateDir, "revit");
+            if (!Directory.Exists(dir)) return 0;
+            int n = 0;
+            foreach (var f in Directory.GetFiles(dir, "*.json"))
+            {
+                var name = Path.GetFileNameWithoutExtension(f);
+                int pid;
+                if (!int.TryParse(name, out pid)) continue;
+                try { using (var p = Process.GetProcessById(pid)) { if (!p.HasExited) n++; } }
+                catch { }
+            }
+            return n;
+        }
+        catch { return 0; }
     }
 
     // ------------------------------------------------------------------ 거들기

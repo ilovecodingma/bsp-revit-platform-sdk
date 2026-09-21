@@ -61,8 +61,22 @@ if (-not $Project) {
   if ($found.Count) {
     Write-Host "  찾은 애드인 프로젝트 :" -ForegroundColor DarkGray
     $i = 1; foreach ($f in $found) { Write-Host ("    {0}) {1}" -f $i, $f.FullName); $i++ }
-    $pick = Ask "번호 또는 경로를 넣으세요" "1"
-    $Project = if ($pick -match '^\d+$' -and [int]$pick -le $found.Count) { $found[[int]$pick - 1].FullName } else { $pick }
+
+    # ★ 대상이 모호하면 **적용하지 않는다.**
+    #   자동 탐지는 «소스가 있는 프로젝트» 만 찾는다. 원하는 애드인의 소스가 이 PC 에 없으면
+    #   엉뚱한 프로젝트가 잡힌다. 말없이 첫 번째를 고르면 남의 프로젝트를 고치게 된다. (실제로 그랬다)
+    if ($Auto -and $found.Count -gt 1) {
+      Write-Host ""
+      Write-Host "  후보가 여러 개입니다 — 어느 것에 붙일지 정해서 다시 부르세요 :" -ForegroundColor Yellow
+      Write-Host "     .\AI\wizard.ps1 -Auto -Project `"<위 경로 중 하나>`"" -ForegroundColor Yellow
+      Write-Host "  (원하는 애드인이 목록에 없으면 그 소스가 이 PC 에 없는 것입니다)" -ForegroundColor Yellow
+      exit 2
+    }
+    if ($Auto) { $Project = $found[0].FullName }
+    else {
+      $pick = Ask "번호 또는 경로를 넣으세요" "1"
+      $Project = if ($pick -match '^\d+$' -and [int]$pick -le $found.Count) { $found[[int]$pick - 1].FullName } else { $pick }
+    }
   }
   else {
     Write-Host "  애드인 프로젝트를 자동으로 못 찾았습니다." -ForegroundColor Yellow

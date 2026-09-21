@@ -60,7 +60,11 @@ $built = @(Get-ChildItem $root -Filter *.dll -Recurse -ErrorAction SilentlyConti
 $verdict = $true; $notes = @()
 foreach ($d in $built) {
   try {
-    $a = [Reflection.Assembly]::ReflectionOnlyLoadFrom($d.FullName)
+    # ★ ReflectionOnlyLoadFrom 은 그 파일을 **프로세스가 끝날 때까지 잠근다.**
+    #   그러면 바로 다음 «빌드» 칸이 그 DLL 을 덮지 못해 실패한다 (실측).
+    #   바이트로 읽어 로드하면 파일 손잡이가 바로 닫힌다.
+    $bytes = [IO.File]::ReadAllBytes($d.FullName)
+    $a = [Reflection.Assembly]::ReflectionOnlyLoad($bytes)
     $refs = $a.GetReferencedAssemblies()
     $dupes = $refs | Group-Object Name | Where-Object Count -gt 1
     foreach ($g in $dupes) { $verdict = $false; $notes += "$($d.Name) : $($g.Name) 가 $($g.Count)개 버전" }
@@ -189,7 +193,20 @@ else {
   $log = Join-Path $stash "build.log"
   if ($msb) { & msbuild $csproj /v:m /nologo > $log 2>&1 }
   else { & dotnet build $csproj -v m > $log 2>&1 }
-  Row "빌드" ($LASTEXITCODE -eq 0) $(if ($LASTEXITCODE -eq 0) { "성공" } else { "실패 — $log" })
+
+  if ($LASTEXITCODE -eq 0) { Row "빌드" $true "성공" }
+  else {
+    # ★ «컴파일 실패» 와 «복사 실패» 를 구분한다.
+    #   리빗이 켜져 있으면 프로젝트의 배포 복사(Addins 로)가 막힌다 — 컴파일은 된 것이다.
+    #   그 배치는 원래 매니저가 리빗 종료 때 하는 일이므로 여기서 실패로 셀 이유가 없다.
+    $logTxt = Get-Content $log -Raw -ErrorAction SilentlyContinue
+    $copyOnly = ($logTxt -match 'MSB302[17]') -and ($logTxt -notmatch '\): error CS')
+    $revitLock = $logTxt -match 'Revit'
+    if ($copyOnly -and $revitLock) {
+      Row "빌드" $null "컴파일 성공 · 배치는 리빗이 물고 있어 보류 (종료 때 매니저가 넣습니다)"
+    }
+    else { Row "빌드" $false "실패 — $log" }
+  }
 }
 
 # ── 8. 검증 ────────────────────────────────────────────────────────
