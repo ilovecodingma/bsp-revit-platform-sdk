@@ -1,0 +1,12 @@
+{
+  "id": "bsp.sample.hello",
+  "name": "Hello Tool",
+  "publisher": "BSP ENGINEERING",
+  "version": "1.0.0",
+  "kind": "tool",
+  "minRevit": "2024",
+  "targetRevit": "2024",
+  "needsModel": false,
+  "permissions": [],
+  "channel": "stable"
+}

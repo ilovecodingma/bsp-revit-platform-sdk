@@ -1,0 +1,12 @@
+{
+  "id": "bsp.core",
+  "name": "BSP 기본",
+  "version": "1.0.0",
+  "members": [
+    { "id": "bsp.platform", "version": "0.9.0" },
+    { "id": "bsp.hts",      "version": "2026.09.21-1053" }
+  ],
+  "pins": [
+    { "assembly": "Newtonsoft.Json", "version": "13.0.3" }
+  ]
+}

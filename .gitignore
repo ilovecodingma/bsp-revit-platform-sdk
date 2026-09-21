@@ -1,0 +1,4 @@
+# 빌드 산출물 (bin\ 의 배포본은 일부러 포함한다 — 받아서 바로 쓰게)
+samples/HelloTool/bin/*.dll
+src/Entry/bin/
+*.pdb

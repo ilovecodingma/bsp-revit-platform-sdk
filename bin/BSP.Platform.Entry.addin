@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RevitAddIns>
+  <AddIn Type="Application">
+    <Name>BSP Platform</Name>
+    <Assembly>BSP.Platform.Entry\BSP.Platform.Entry.dll</Assembly>
+    <AddInId>5C7D1E92-3A46-4B08-9F21-6D4E8B3A7C55</AddInId>
+    <FullClassName>BSP.Platform.Entry.App</FullClassName>
+    <VendorId>BSPE</VendorId>
+    <VendorDescription>BSP ENGINEERING CO., Ltd</VendorDescription>
+  </AddIn>
+</RevitAddIns>
