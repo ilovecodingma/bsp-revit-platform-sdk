@@ -21,6 +21,7 @@ BSP_SDK\
 
   CLAUDE.md                 AI 에게 주는 오리엔테이션 (이 폴더에서 열면 자동으로 읽힌다)
   AI\HARNESS.md             ★ 경계 — 우리 최소 코어 / 하네스 / 그쪽 몫
+  AI\ATTACH.md              ★ 이미 있는 플랫폼 코드에 붙이는 법 (네 줄 · 3단계 이관)
   AI\MIGRATE.md             전환 매뉴얼 — 지금 구조 → 런처 형식, 6단계·단계마다 확인
   AI\TEST.md                시험 매뉴얼 — 무엇을 어떻게 확인하고 어떻게 적는가
   AI\ADAPT_HTS.md           지시서 — 기존 애드온(HTS)을 플랫폼에 태운다
@@ -53,6 +54,17 @@ BSP_SDK\
 ## 붙여넣을 한 줄 (이것만 하면 된다)
 
 AI(클로드 코드 등)에 **아래를 그대로 붙여 넣고 엔터.** 나머지는 AI 가 물어보면서 진행한다.
+
+**이미 리빗 플랫폼(애드인)을 만들어 두셨다면** :
+
+```
+https://github.com/ilovecodingma/bsp-revit-platform-sdk 를 내려받아서
+AI\ATTACH.md 를 읽고 내 플랫폼 코드에 붙여줘.
+내 코드를 먼저 읽고 어디에 넣을지 알려준 다음에 고치고,
+bsp-probe 와 리빗 실기 확인까지 결과를 보여줘.
+```
+
+**아직 없거나 환경부터 맞추려면** :
 
 ```
 https://github.com/ilovecodingma/bsp-revit-platform-sdk 를 내려받아서
