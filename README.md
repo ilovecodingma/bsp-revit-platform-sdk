@@ -20,6 +20,7 @@ BSP_SDK\
   PROPOSAL.md               한 장짜리 제안 — 무엇을 드리고 무엇을 맡기는가
 
   CLAUDE.md                 AI 에게 주는 오리엔테이션 (이 폴더에서 열면 자동으로 읽힌다)
+  docs\                     논의 기록 — 왜 그렇게 정했나 (결정 기록 · 현황과 실측 · 배경)
   AI\HARNESS.md             ★ 경계 — 우리 최소 코어 / 하네스 / 그쪽 몫
   AI\ATTACH.md              ★ 이미 있는 플랫폼 코드에 붙이는 법 (네 줄 · 3단계 이관)
   AI\MIGRATE.md             전환 매뉴얼 — 지금 구조 → 런처 형식, 6단계·단계마다 확인
@@ -87,6 +88,7 @@ git clone https://github.com/ilovecodingma/bsp-revit-platform-sdk
 4. `AI\MIGRATE.md` — **지금 구조를 런처 형식으로 바꾸는 6단계.**
    각 단계의 «붙여넣을 문장» 을 AI 에 그대로 넣고 엔터, 끝날 때마다 «확인» 을 돌린다
 5. `AI\TEST.md` — 확인·시험 매뉴얼. 결과를 그대로 적어 남긴다
+6. `docs\` — 여기까지 온 논의 기록. **`docs-결정-기록.md`** 가 «왜» 를 담고 있다
 
 ## 30초 요약
 
