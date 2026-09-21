@@ -37,6 +37,8 @@ BSP_SDK\
 
   SPEC\LAUNCHER.md          ★ 런처 최소기능 공통설계 (여기부터 읽는다)
   SPEC\ADAPTER.md           ★ 남의 서버를 런처 뒤에 붙이는 세 가지 길
+  SPEC\STORE-UI.md          ★ 스토어 화면 계약 — store.json 을 읽고 cmd 로 시킨다
+  SPEC\FAULT.md             ★ 사고 처리 — 귀속 · 멈춤 · 3회 자동 격리
   SPEC\CONTRACT.md          도구 계약   — 무엇을 구현하고 무엇을 하면 안 되는가
   SPEC\PROCESS.md           프로세스 구조 — 애드온은 점화만, 관리는 별도 프로세스
   SPEC\CALLBACKS.md         콜백 규격   — 남기는 것 · 걷는 것 · 받는 것

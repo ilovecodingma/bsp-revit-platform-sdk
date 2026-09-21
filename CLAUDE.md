@@ -34,6 +34,9 @@
 | 지금 구조를 런처 형식으로 바꾼다 (플랫폼이 없을 때) | `AI\MIGRATE.md` — 6단계 |
 | 기존 애드온(HTS 등)을 플랫폼에 태운다 | `AI\ADAPT_HTS.md` (전환 5단계에서 부른다) |
 | 서버를 만든다 (언어·틀 자유) | `AI\SERVER.md` (전환 6단계) |
+| 스토어 화면에 물린다 | `SPEC\STORE-UI.md` (읽기 store.json · 시키기 cmd) |
+| 사고·격리를 본다 | `SPEC\FAULT.md` |
+| MCP 연계 | `research\MCP\README.md` — **연구 공간. 제품에 섞지 않는다** |
 | 확인·시험 | `AI\TEST.md` · `AI\selftest.ps1` · `AI\healthcheck.ps1` · `AI\snapshot.ps1` |
 
 두 지시서는 **끝에 «합격 시험» 이 붙어 있다.** 사람 눈이 아니라 그 시험으로 판정한다.
