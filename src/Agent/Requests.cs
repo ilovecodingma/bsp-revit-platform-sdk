@@ -19,7 +19,7 @@ using System.IO;
 using System.Text;
 using System.Threading;
 
-namespace BSP.Platform.Entry
+namespace BSP.Platform.Agent
 {
     /// <summary>요청 한 건의 결과.</summary>
     public class Answer
@@ -31,18 +31,9 @@ namespace BSP.Platform.Entry
         public override string ToString() { return Status + (Message.Length > 0 ? " · " + Message : ""); }
     }
 
-    public static class Requests
+    internal static class Requests
     {
         public static string CmdDir { get { return Path.Combine(LauncherHost.StateDir, "cmd"); } }
-
-        public static Answer Install(string productId, int timeoutMs = 120000)
-        { return Send("install", productId, timeoutMs); }
-
-        public static Answer SyncAll(int timeoutMs = 120000)
-        { return Send("sync", "", timeoutMs); }
-
-        public static Answer Enable(string productId) { return Send("enable", productId, 15000); }
-        public static Answer Disable(string productId) { return Send("disable", productId, 15000); }
 
         /// <summary>요청을 넣고 답을 기다린다. **UI 스레드에서 부르지 않는다** — 백그라운드에서 부르고
         /// 결과만 화면에 올린다. 매니저가 죽어 있으면 먼저 깨우고 다시 기다린다.</summary>
@@ -52,7 +43,7 @@ namespace BSP.Platform.Entry
             try
             {
                 if (!LauncherHost.Alive())
-                    LauncherHost.Ensure(App.RevitYear, App.Pid);   // 없으면 깨운다
+                    LauncherHost.Ensure(BspAgent.Year, BspAgent.Pid);   // 없으면 깨운다
 
                 Directory.CreateDirectory(CmdDir);
                 var ticket = DateTime.Now.ToString("yyyyMMddHHmmssfff") + "-" +

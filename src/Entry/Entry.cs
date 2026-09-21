@@ -18,6 +18,7 @@ using System.Threading;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
+using BSP.Platform.Agent;
 
 namespace BSP.Platform.Entry
 {
@@ -38,9 +39,9 @@ namespace BSP.Platform.Entry
                 Ribbon(a);
 
                 // 점화는 백그라운드로. 매니저가 느리게 떠도 리빗은 기다리지 않는다.
-                var t = new Thread(() => LauncherHost.Ensure(RevitYear, Pid));
+                var t = new Thread(() => BspAgent.Attach(RevitYear, Pid));
                 t.IsBackground = true;
-                t.Name = "BSP.LauncherHost";
+                t.Name = "BSP.Agent.Attach";
                 t.Start();
             }
             catch (Exception ex) { Log("기동", "failed", sw.ElapsedMilliseconds, ex.Message); }
@@ -51,8 +52,9 @@ namespace BSP.Platform.Entry
 
         public Result OnShutdown(UIControlledApplication a)
         {
-            // 매니저는 건드리지 않는다. 종료 감지·큐 적용은 매니저의 일이다.
-            try { LauncherHost.Release(Pid); } catch { }
+            // 매니저를 죽이지 않는다. 세션 표시만 지우면, 마지막 세션이었을 때
+            // 매니저가 스스로 마무리(큐 적용·기록 업로드)하고 끝낸다.
+            try { BspAgent.Detach(); } catch { }
             return Result.Succeeded;
         }
 
@@ -73,28 +75,9 @@ namespace BSP.Platform.Entry
         }
 
         // ------------------------------------------------------------------ 기록
-        /// <summary>한 줄 = JSON 하나. 매니저가 걷어서 서버로 올린다. (CALLBACKS.md 1-1)</summary>
+        /// <summary>기록은 라이브러리가 쓴다 — 서식이 한 곳에만 있게 한다.</summary>
         internal static void Log(string tool, string outcome, long ms, string note)
-        {
-            try
-            {
-                Directory.CreateDirectory(LauncherHost.StateDir);
-                var line = "{\"t\":\"" + DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss") +
-                           "\",\"product\":\"bsp.platform\",\"tool\":\"" + Esc(tool) +
-                           "\",\"outcome\":\"" + outcome + "\",\"ms\":" + ms +
-                           ",\"host\":\"" + Esc(Environment.MachineName) +
-                           "\",\"user\":\"" + Esc(Environment.UserName) +
-                           "\",\"note\":\"" + Esc(note) + "\"}\r\n";
-                File.AppendAllText(Path.Combine(LauncherHost.StateDir, "runlog.jsonl"),
-                                   line, new UTF8Encoding(false));      // BOM 없는 UTF-8
-            }
-            catch { }                                                   // 기록 실패가 업무를 막지 않는다
-        }
-
-        static string Esc(string s)
-        {
-            return (s ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", " ").Replace("\r", " ");
-        }
+        { BspAgent.Log("bsp.platform", tool, outcome, ms, note); }
     }
 
     [Transaction(TransactionMode.Manual)]
@@ -103,17 +86,17 @@ namespace BSP.Platform.Entry
         public Result Execute(ExternalCommandData c, ref string msg, ElementSet e)
         {
             var sw = Stopwatch.StartNew();
-            var alive = LauncherHost.Alive();
-            var exe = LauncherHost.FindExe() ?? "(없음)";
+            var alive = BspAgent.ManagerAlive;
+            var exe = BspAgent.ManagerPath ?? "(없음)";
 
             var sb = new StringBuilder();
             sb.AppendLine("매니저 : " + (alive ? "돌고 있음" : "꺼져 있음"));
             sb.AppendLine("실행 파일 : " + exe);
-            sb.AppendLine("마지막 점화 : " + LauncherHost.Last);
-            sb.AppendLine("상태 폴더 : " + LauncherHost.StateDir);
+            sb.AppendLine("마지막 점화 : " + BspAgent.LastAction);
+            sb.AppendLine("상태 폴더 : " + BspAgent.StateDir);
             sb.AppendLine("이 리빗 : " + App.RevitYear + " · pid " + App.Pid + " · 기동 +" + App.BootMs + "ms");
 
-            var state = Path.Combine(LauncherHost.StateDir, "state.json");
+            var state = Path.Combine(BspAgent.StateDir, "state.json");
             sb.AppendLine("카탈로그 : " + (File.Exists(state)
                 ? File.GetLastWriteTime(state).ToString("MM-dd HH:mm") + " 갱신"
                 : "아직 받은 적 없음"));
@@ -126,7 +109,7 @@ namespace BSP.Platform.Entry
             };
             if (!alive) d.AddCommandLink(TaskDialogCommandLinkId.CommandLink1, "지금 띄우기");
             var r = d.Show();
-            if (r == TaskDialogResult.CommandLink1) LauncherHost.Ensure(App.RevitYear, App.Pid);
+            if (r == TaskDialogResult.CommandLink1) BspAgent.Attach(App.RevitYear, App.Pid);
 
             App.Log("상태", "succeeded", sw.ElapsedMilliseconds, alive ? "alive" : "down");
             return Result.Succeeded;

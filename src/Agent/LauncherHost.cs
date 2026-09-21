@@ -4,10 +4,13 @@
 //   중요한 것은 «어떻게 띄우느냐» 다.
 //
 //   ┌ 리빗(Revit.exe) ─────────────┐        ┌ bsp-launcher.exe ────────────┐
-//   │  BSP.Platform.Entry.dll      │  점화  │  상주 · 리빗과 수명이 다르다  │
-//   │   OnStartup → Ensure()  ─────┼──────▶ │  리빗이 죽어도 산다           │
-//   │   (곧바로 돌아온다)          │        │  리빗이 없어도 산다           │
+//   │  BSP.Platform.Entry.dll      │  점화  │  별도 프로세스 (자식 아님)    │
+//   │   OnStartup → Ensure()  ─────┼──────▶ │  리빗이 죽어도 마무리는 한다  │
+//   │   OnShutdown → Release()     │        │  애드온이 다 내려가면 끝낸다  │
 //   └──────────────────────────────┘        └──────────────────────────────┘
+//
+//   수명은 «애드온» 을 따라간다 — 리빗 프로세스가 아니라 우리 애드온이 살아 있는 동안이다.
+//   애드온이 안 뜬 리빗은 세지 않고, 크래시로 OnShutdown 이 안 불려도 pid+시작시각으로 걸러진다.
 //            │                                         ▲
 //            └──── 파일(%AppData%\BSP\Platform) ────────┘
 //
@@ -30,17 +33,22 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 
-namespace BSP.Platform.Entry
+namespace BSP.Platform.Agent
 {
-    public static class LauncherHost
+    internal static class LauncherHost
     {
         public const string MutexName = "BSP.Launcher.Agent.v1";
         const int BeatStaleSeconds = 240;      // 심장박동이 이보다 낡으면 죽은 것으로 본다
 
+        /// <summary>상태 폴더. 매니저와 **반드시 같은 곳**을 봐야 한다.
+        /// 그래서 매니저와 똑같이 BSP_STATE_DIR 환경변수를 먼저 본다
+        /// (시험·공용 PC·프로필이 여러 개인 환경에서 쓴다).</summary>
         public static string StateDir
         {
             get
             {
+                var o = Environment.GetEnvironmentVariable("BSP_STATE_DIR");
+                if (!string.IsNullOrEmpty(o)) return o;
                 return Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                     "BSP", "Platform");
@@ -75,7 +83,8 @@ namespace BSP.Platform.Entry
             catch (Exception ex) { Last = "실패 : " + ex.Message; return false; }
         }
 
-        /// <summary>리빗이 닫힐 때 — 매니저는 죽이지 않는다. 내 자취만 지운다.</summary>
+        /// <summary>리빗이 닫힐 때 — 매니저를 죽이지 않는다. 내 세션 표시만 지운다.
+        /// 마지막 세션이 사라지면 매니저가 스스로 마무리(큐 적용·기록 업로드)하고 끝낸다.</summary>
         public static void Release(int revitPid)
         {
             try { File.Delete(Path.Combine(SessionDir, revitPid + ".json")); } catch { }
@@ -262,7 +271,12 @@ namespace BSP.Platform.Entry
             try
             {
                 var f = Path.Combine(SessionDir, pid + ".json");
-                var s = "{\"pid\":" + pid + ",\"year\":\"" + year + "\",\"since\":\"" +
+                // 시작 시각(ticks)을 같이 남긴다 — 리빗이 크래시해 OnShutdown 이 안 불린 뒤
+                // 같은 pid 가 재사용되면, 이 값이 없으면 «살아 있는 세션» 으로 오인된다.
+                long ticks = 0;
+                try { ticks = Process.GetCurrentProcess().StartTime.Ticks; } catch { }
+                var s = "{\"pid\":" + pid + ",\"startedTicks\":" + ticks +
+                        ",\"year\":\"" + year + "\",\"since\":\"" +
                         DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss") + "\",\"host\":\"" +
                         Environment.MachineName + "\",\"user\":\"" + Environment.UserName + "\"}";
                 File.WriteAllText(f, s, new UTF8Encoding(false));
