@@ -9,6 +9,7 @@ $here = $PSScriptRoot
 $out  = Join-Path $here "bin"
 $csc  = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
 $rev  = "C:\Program Files\Autodesk\Revit $RevitYear"
+$fw   = "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8"
 
 if (-not (Test-Path $csc)) { throw "csc 없음 : $csc" }
 if (-not (Test-Path "$rev\RevitAPI.dll")) { throw "RevitAPI 없음 : $rev  (NuGet Nice3point.Revit.Api.RevitAPI 로 대체 가능)" }
@@ -17,12 +18,13 @@ New-Item -ItemType Directory -Force $out | Out-Null
 $refs = @(
   "$rev\RevitAPI.dll", "$rev\RevitAPIUI.dll",
   "$here\..\Agent\bin\BSP.Platform.Agent.dll",
-  "System.dll", "System.Core.dll", "System.Management.dll"
+  "System.dll", "System.Core.dll", "System.Management.dll",
+  "$fw\PresentationCore.dll", "$fw\PresentationFramework.dll", "$fw\WindowsBase.dll", "$fw\System.Xaml.dll"
 ) | ForEach-Object { "/r:`"$_`"" }
 
 $dll = Join-Path $out "BSP.Platform.Entry.dll"
 & $csc /nologo /target:library /platform:x64 /optimize+ /codepage:65001 `
-       /out:"$dll" $refs "$here\Entry.cs"
+       /out:"$dll" $refs "$here\Entry.cs" "$here\StorePane.cs"
 if ($LASTEXITCODE -ne 0) { throw "컴파일 실패" }
 Write-Host ("[빌드] {0}  ({1} KB)" -f $dll, [int]((Get-Item $dll).Length/1KB))
 
@@ -52,7 +54,7 @@ if ($Install) {
   $dest = "$env:APPDATA\Autodesk\Revit\Addins\$RevitYear"
   New-Item -ItemType Directory -Force (Join-Path $dest "BSP.Platform.Entry") | Out-Null
   Copy-Item $dll (Join-Path $dest "BSP.Platform.Entry\BSP.Platform.Entry.dll") -Force
-  Copy-Item "$here\..\Agentin\BSP.Platform.Agent.dll" (Join-Path $dest "BSP.Platform.Entry\") -Force
+  Copy-Item "$here\..\Agent\bin\BSP.Platform.Agent.dll" (Join-Path $dest "BSP.Platform.Entry\") -Force
   Copy-Item $addinPath (Join-Path $dest "BSP.Platform.Entry.addin") -Force
 
   # 매니저 본체는 애드온 옆에 둔다 — 애드온이 가장 먼저 찾는 자리
